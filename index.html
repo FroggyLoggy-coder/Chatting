@@ -4,8 +4,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Chat</title>
-    <!-- Stabile Echtzeit-Verbindung ohne Firewall-Probleme -->
-    <script src="https://pusher.com"></script>
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; font-family: sans-serif; }
         body { display: flex; justify-content: center; align-items: center; height: 100vh; background-color: #111; color: #fff; }
@@ -22,6 +20,7 @@
         input { background: #444; color: #fff; width: 100%; }
         input:focus { outline: none; }
         button { background: #00a884; color: white; cursor: pointer; font-weight: bold; }
+        .error { color: #ff4a4a; font-size: 0.9rem; text-align: center; display: none; }
     </style>
 </head>
 <body>
@@ -29,16 +28,30 @@
 <div id="chat-container">
     <div id="header">Chat</div>
     
-    <!-- Login / Code-Auswahl -->
     <div id="setup-area">
-        <p style="text-align: center;">Denkt euch ein gemeinsames Geheimwort aus (Friend Code):</p>
-        <input type="text" id="friend-code" placeholder="Z.B. geheim1234">
-        <p style="text-align: center;">Dein Name im Chat:</p>
+        <p style="text-align: center; font-weight: bold;">Registrierung / Login</p>
+        
+        <p style="font-size: 0.9rem; color: #aaa;">Gib deine gewünschte Friend-Code-Zahl ein (6 bis 9 Ziffern):</p>
+        <div style="display: flex; align-items: center; gap: 5px;">
+            <input type="number" id="my-fc-number" placeholder="z.B. 123456" min="100000" max="999999999">
+            <span style="font-weight: bold; font-size: 1.2rem; color: #00a884;">.fc</span>
+        </div>
+
+        <p style="font-size: 0.9rem; color: #aaa;">Dein Name im Chat:</p>
         <input type="text" id="username" placeholder="Dein Name...">
-        <button onclick="startChat()">Chat betreten</button>
+
+        <hr style="border-color: #444; margin: 10px 0;">
+
+        <p style="font-size: 0.9rem; color: #aaa;">Friend Code des Freundes (Zahl eingeben):</p>
+        <div style="display: flex; align-items: center; gap: 5px;">
+            <input type="number" id="friend-fc-number" placeholder="Code des Freundes...">
+            <span style="font-weight: bold; font-size: 1.2rem; color: #333;">.fc</span>
+        </div>
+
+        <div id="setup-error" class="error"></div>
+        <button onclick="startChat()">Registrieren & Verbinden</button>
     </div>
 
-    <!-- Der eigentliche Chat -->
     <div id="chat-area">
         <div id="messages"></div>
         <div id="input-area">
@@ -49,37 +62,42 @@
 </div>
 
 <script>
-    let pusher = null;
-    let channel = null;
-    let code = "";
-    let user = "";
+    let myRoom = "";
+    let myName = "";
+    let lastTimestamp = 0;
+    let pollInterval = null;
 
     function startChat() {
-        code = document.getElementById('friend-code').value.trim().toLowerCase();
-        user = document.getElementById('username').value.trim();
+        const myFc = document.getElementById('my-fc-number').value.trim();
+        myName = document.getElementById('username').value.trim();
+        const friendFc = document.getElementById('friend-fc-number').value.trim();
+        const errorDiv = document.getElementById('setup-error');
 
-        if (!code || !user) {
-            alert("Bitte Friend Code und Name eingeben!");
+        errorDiv.style.display = "none";
+
+        // Überprüfung der Länge (Mehr als 5, weniger als 10 Zeichen)
+        if (myFc.length < 6 || myFc.length > 9 || friendFc.length < 6 || friendFc.length > 9) {
+            errorDiv.innerText = "Fehler: Die Zahlen müssen zwischen 6 und 9 Stellen lang sein!";
+            errorDiv.style.display = "block";
             return;
         }
 
-        // Verbindung zum weltweiten Echtzeit-Netzwerk aufbauen
-        pusher = new Pusher('app-key', {
-            cluster: 'eu',
-            forceTLS: true
-        });
+        if (!myName) {
+            errorDiv.innerText = "Bitte gib deinen Namen ein!";
+            errorDiv.style.display = "block";
+            return;
+        }
 
-        // Euren privaten Kanal abonnieren (wird durch das Geheimwort geschützt)
-        channel = pusher.subscribe('chat-' + code);
-
-        // Auf eingehende Nachrichten von deinem Freund warten
-        channel.bind('message-event', function(data) {
-            const type = (data.sender === user) ? 'sent' : 'received';
-            displayMessage(data.sender, data.text, type);
-        });
+        // Raum-ID wird aus beiden Codes generiert, damit beide im selben Raum landen
+        const codes = [myFc, friendFc].sort();
+        myRoom = "room_" + codes[0] + "_" + codes[1];
 
         document.getElementById('setup-area').style.display = 'none';
         document.getElementById('chat-area').style.display = 'flex';
+
+        // Nachrichten-Abfrage alle 2 Sekunden starten (ohne Lade-Hänger)
+        getMessages();
+        pollInterval = setInterval(getMessages, 2000);
     }
 
     function sendMessage() {
@@ -88,27 +106,52 @@
         
         if (!text) return;
 
-        // Nachricht über ein freies, sicheres API-Gateway senden
-        fetch('https://allorigins.win' + encodeURIComponent('https://ifttt.com' + user + '&value2=' + text + '&value3=' + code))
-        .then(() => {
-            // Falls das Gateway hakt, senden wir es für den Test direkt an den lokalen Kanal
-            // (Im echten Betrieb sendet der Server dies an alle Teilnehmer)
-        });
+        const msgData = {
+            sender: myName,
+            text: text,
+            timestamp: Date.now()
+        };
 
-        // Alternativer direkter Push-Simulator für den Sofort-Test
-        // Da wir ohne eigenen Server arbeiten, senden wir die Daten direkt in den Pusher-Kanal
-        displayMessage(user, text, 'sent');
-        input.value = '';
+        // Speichern über eine freie, universelle KV-Repository-API
+        fetch(`https://p3k.io{myRoom}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(msgData)
+        })
+        .then(() => {
+            input.value = '';
+            getMessages();
+        })
+        .catch(err => console.error("Sende-Fehler:", err));
     }
 
-    function displayMessage(sender, text, type) {
-        const messagesDiv = document.getElementById('messages');
-        const msgElement = document.createElement('div');
-        msgElement.classList.add('msg', type);
-        msgElement.innerText = (type === 'received' ? sender + ": " : "") + text;
-        
-        messagesDiv.appendChild(msgElement);
-        messagesDiv.scrollTop = messagesDiv.scrollHeight;
+    function getMessages() {
+        fetch(`https://p3k.io{myRoom}`)
+        .then(response => {
+            if (response.status === 404) return [];
+            return response.json();
+        })
+        .then(data => {
+            // Falls die API ein einzelnes Objekt liefert, machen wir ein Array daraus
+            const messages = Array.isArray(data) ? data : [data];
+            const messagesDiv = document.getElementById('messages');
+            
+            // Nur aktualisieren, wenn neue Nachrichten da sind
+            if (messages.length > 0) {
+                messagesDiv.innerHTML = "";
+                messages.forEach(msg => {
+                    if (msg.sender && msg.text) {
+                        const type = (msg.sender === myName) ? 'sent' : 'received';
+                        const msgElement = document.createElement('div');
+                        msgElement.classList.add('msg', type);
+                        msgElement.innerText = (type === 'received' ? msg.sender + ": " : "") + msg.text;
+                        messagesDiv.appendChild(msgElement);
+                    }
+                });
+                messagesDiv.scrollTop = messagesDiv.scrollHeight;
+            }
+        })
+        .catch(err => console.error("Lade-Fehler:", err));
     }
 
     function checkEnter(event) {
