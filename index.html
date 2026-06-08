@@ -3,150 +3,75 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Chat</title>
+    <title>Tic-Tac-Toe</title>
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; font-family: sans-serif; }
-        body { display: flex; justify-content: center; align-items: center; height: 100vh; background-color: #111; color: #fff; }
-        #chat-container { width: 100%; max-width: 500px; height: 90vh; background: #222; display: flex; flex-direction: column; border-radius: 8px; overflow: hidden; }
-        #header { background: #333; padding: 15px; text-align: center; font-weight: bold; border-bottom: 1px solid #444; display: flex; justify-content: space-between; align-items: center; }
-        #back-btn { background: none; color: #00a884; font-size: 1rem; display: none; }
-        .area { padding: 20px; display: flex; flex-direction: column; gap: 15px; justify-content: center; height: 100%; }
-        #list-area, #chat-area { display: none; padding: 0; }
-        #chat-list { display: flex; flex-direction: column; height: 100%; overflow-y: auto; }
-        .chat-item { display: flex; align-items: center; gap: 15px; padding: 15px; border-bottom: 1px solid #333; cursor: pointer; transition: 0.2s; }
-        .chat-item:hover { background: #2a2a2a; }
-        .chat-avatar { width: 45px; height: 45px; background: #444; border-radius: 50%; display: flex; justify-content: center; align-items: center; font-size: 1.2rem; }
-        .chat-info { flex: 1; }
-        .chat-name { font-weight: bold; font-size: 1rem; }
-        #messages { flex: 1; padding: 20px; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; background: #111; }
-        .msg { max-width: 80%; padding: 10px; border-radius: 8px; word-wrap: break-word; line-height: 1.4; }
-        .msg.sent { background-color: #005c4b; align-self: flex-end; }
-        .msg.received { background-color: #333; align-self: flex-start; }
-        #input-area { padding: 15px; background: #333; display: flex; gap: 10px; }
-        input, button { padding: 12px; border: none; border-radius: 6px; font-size: 1rem; }
-        input { background: #444; color: #fff; width: 100%; }
-        input:focus { outline: none; }
-        button { background: #00a884; color: white; cursor: pointer; font-weight: bold; }
-        .error { color: #ff4a4a; font-size: 0.9rem; text-align: center; display: none; }
+        body { display: flex; justify-content: center; align-items: center; height: 100vh; background-color: #111; color: #fff; flex-direction: column; gap: 20px; }
+        h1 { color: #00a884; }
+        #board { display: grid; grid-template-columns: repeat(3, 100px); grid-template-rows: repeat(3, 100px); gap: 5px; }
+        .cell { background-color: #222; border: 2px solid #444; border-radius: 8px; display: flex; justify-content: center; align-items: center; font-size: 2.5rem; font-weight: bold; cursor: pointer; user-select: none; }
+        .cell:hover { background-color: #2a2a2a; }
+        #status { font-size: 1.2rem; font-weight: bold; min-height: 30px; }
+        button { padding: 10px 20px; font-size: 1rem; background-color: #00a884; color: white; border: none; border-radius: 5px; cursor: pointer; font-weight: bold; }
+        button:hover { background-color: #008f72; }
     </style>
 </head>
 <body>
-<div id="chat-container">
-    <div id="header">
-        <button id="back-btn" onclick="showChatList()">‹ Zurück</button>
-        <span id="header-title">Registrieren</span>
-        <span style="width: 50px;"></span>
+    <h1>Tic-Tac-Toe</h1>
+    <div id="status">Spieler X ist dran</div>
+    <div id="board">
+        <div class="cell" onclick="makeMove(this, 0)"></div>
+        <div class="cell" onclick="makeMove(this, 1)"></div>
+        <div class="cell" onclick="makeMove(this, 2)"></div>
+        <div class="cell" onclick="makeMove(this, 3)"></div>
+        <div class="cell" onclick="makeMove(this, 4)"></div>
+        <div class="cell" onclick="makeMove(this, 5)"></div>
+        <div class="cell" onclick="makeMove(this, 6)"></div>
+        <div class="cell" onclick="makeMove(this, 7)"></div>
+        <div class="cell" onclick="makeMove(this, 8)"></div>
     </div>
-    <div id="login-area" class="area">
-        <p style="font-size: 0.9rem; color: #aaa;">Wähle deine eigene Nummer (6 bis 9 Zahlen):</p>
-        <input type="number" id="my-fc-number" placeholder="Deine Nummer...">
-        <p style="font-size: 0.9rem; color: #aaa;">Dein Name im Chat:</p>
-        <input type="text" id="username" placeholder="Dein Name...">
-        <div id="login-error" class="error"></div>
-        <button onclick="registerAndLogin()">Registrieren</button>
-    </div>
-    <div id="list-area" class="area">
-        <div style="padding: 15px; display: flex; gap: 10px; border-bottom: 1px solid #333;">
-            <input type="number" id="new-friend-fc" placeholder="Freund-Nummer hinzufügen...">
-            <button onclick="addFriendChat()">+</button>
-        </div>
-        <div id="chat-list"></div>
-    </div>
-    <div id="chat-area" class="area">
-        <div id="messages"></div>
-        <div id="input-area">
-            <input type="text" id="message-input" placeholder="Nachricht..." onkeypress="checkEnter(event)">
-            <button onclick="sendMessage()">Senden</button>
-        </div>
-    </div>
-</div>
+    <button onclick="resetGame()">Neu starten</button>
 <script>
-    let myFc = "";
-    let myName = "";
-    let activeChatId = "";
-    let chats = {};
-    function registerAndLogin() {
-        myFc = document.getElementById('my-fc-number').value.trim();
-        myName = document.getElementById('username').value.trim();
-        const errorDiv = document.getElementById('login-error');
-        if (myFc.length < 6 || myFc.length > 9 || !myName) {
-            errorDiv.innerText = "Fehler: Ungültige Daten!";
-            errorDiv.style.display = "block";
+    let board = ["", "", "", "", "", "", "", "", ""];
+    let currentPlayer = "X";
+    let gameActive = true;
+    const winConditions = [[0,1,2], [3,4,5], [6,7,8], [0,3,6], [1,4,7], [2,5,8], [0,4,8], [2,4,6]];
+    function makeMove(cell, index) {
+        if (board[index] !== "" || !gameActive) return;
+        board[index] = currentPlayer;
+        cell.textContent = currentPlayer;
+        cell.style.color = currentPlayer === "X" ? "#00a884" : "#0284c7";
+        checkResult();
+    }
+    function checkResult() {
+        let roundWon = false;
+        for (let i = 0; i < winConditions.length; i++) {
+            const [a, b, c] = winConditions[i];
+            if (board[a] && board[a] === board[b] && board[a] === board[c]) {
+                roundWon = true;
+                break;
+            }
+        }
+        if (roundWon) {
+            document.getElementById('status').textContent = `🎉 Spieler ${currentPlayer} gewinnt!`;
+            gameActive = false;
             return;
         }
-        chats["self_" + myFc] = { name: "Notiz an mich", isSelf: true, messages: [], avatar: "📝" };
-        loadSavedChats();
-        showChatList();
-    }
-    function showChatList() {
-        document.getElementById('login-area').style.display = 'none';
-        document.getElementById('chat-area').style.display = 'none';
-        document.getElementById('back-btn').style.display = 'none';
-        document.getElementById('list-area').style.display = 'flex';
-        document.getElementById('header-title').innerText = "Chats";
-        renderChatList();
-    }
-    function renderChatList() {
-        const listDiv = document.getElementById('chat-list');
-        listDiv.innerHTML = "";
-        Object.keys(chats).forEach(id => {
-            const chat = chats[id];
-            const item = document.createElement('div');
-            item.classList.add('chat-item');
-            item.onclick = () => openChat(id);
-            item.innerHTML = `<div class="chat-avatar">${chat.avatar}</div><div class="chat-info"><div class="chat-name">${chat.name}</div></div>`;
-            listDiv.appendChild(item);
-        });
-    }
-    function addFriendChat() {
-        const friendFc = document.getElementById('new-friend-fc').value.trim();
-        if (friendFc.length < 6 || friendFc.length > 9 || friendFc === myFc) return;
-        const chatId = "friend_" + friendFc;
-        if (!chats[chatId]) {
-            chats[chatId] = { name: friendFc + ".fc", isSelf: false, messages: [], avatar: "👤" };
-            saveChatsToStorage();
-            renderChatList();
+        if (!board.includes("")) {
+            document.getElementById('status').textContent = "Unentschieden! 🤝";
+            gameActive = false;
+            return;
         }
-        document.getElementById('new-friend-fc').value = "";
+        currentPlayer = currentPlayer === "X" ? "O" : "X";
+        document.getElementById('status').textContent = `Spieler ${currentPlayer} ist dran`;
     }
-    function openChat(id) {
-        activeChatId = id;
-        document.getElementById('list-area').style.display = 'none';
-        document.getElementById('chat-area').style.display = 'flex';
-        document.getElementById('back-btn').style.display = 'block';
-        document.getElementById('header-title').innerText = chats[id].name;
-        renderMessages();
+    function resetGame() {
+        board = ["", "", "", "", "", "", "", "", ""];
+        currentPlayer = "X";
+        gameActive = true;
+        document.getElementById('status').textContent = "Spieler X ist dran";
+        document.querySelectorAll('.cell').forEach(cell => cell.textContent = "");
     }
-    function sendMessage() {
-        const input = document.getElementById('message-input');
-        const text = input.value.trim();
-        if (!text || !activeChatId) return;
-        chats[activeChatId].messages.push({ sender: myName, text: text });
-        saveChatsToStorage();
-        renderMessages();
-        input.value = '';
-    }
-    function renderMessages() {
-        const messagesDiv = document.getElementById('messages');
-        messagesDiv.innerHTML = "";
-        const currentChat = chats[activeChatId];
-        currentChat.messages.forEach(msg => {
-            const type = (currentChat.isSelf || msg.sender === myName) ? 'sent' : 'received';
-            const msgElement = document.createElement('div');
-            msgElement.classList.add('msg', type);
-            msgElement.innerText = text = msg.text;
-            messagesDiv.appendChild(msgElement);
-        });
-        messagesDiv.scrollTop = messagesDiv.scrollHeight;
-    }
-    function saveChatsToStorage() {
-        localStorage.setItem('stored_chats_' + myFc, JSON.stringify(chats));
-    }
-    function loadSavedChats() {
-        const saved = localStorage.getItem('stored_chats_' + myFc);
-        if (saved) { chats = JSON.parse(saved); }
-    }
-    function checkEnter(event) { if (event.key === 'Enter') { sendMessage(); } }
 </script>
 </body>
 </html>
