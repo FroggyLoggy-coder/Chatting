@@ -9,8 +9,11 @@
         body { display: flex; justify-content: center; align-items: center; height: 100vh; background-color: #111; color: #fff; }
         #chat-container { width: 100%; max-width: 500px; height: 90vh; background: #222; display: flex; flex-direction: column; border-radius: 8px; overflow: hidden; }
         #header { background: #333; padding: 15px; text-align: center; font-weight: bold; border-bottom: 1px solid #444; }
-        #setup-area { padding: 20px; display: flex; flex-direction: column; gap: 15px; justify-content: center; height: 100%; }
-        #chat-area { display: none; flex-direction: column; height: 100%; }
+        
+        /* Die drei verschiedenen Bereiche */
+        .area { padding: 20px; display: flex; flex-direction: column; gap: 15px; justify-content: center; height: 100%; }
+        #connect-area, #chat-area { display: none; }
+        
         #messages { flex: 1; padding: 20px; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; background: #111; }
         .msg { max-width: 80%; padding: 10px; border-radius: 8px; word-wrap: break-word; }
         .msg.sent { background-color: #005c4b; align-self: flex-end; }
@@ -21,38 +24,54 @@
         input:focus { outline: none; }
         button { background: #00a884; color: white; cursor: pointer; font-weight: bold; }
         .error { color: #ff4a4a; font-size: 0.9rem; text-align: center; display: none; }
+        .info-box { background: #333; padding: 12px; border-radius: 6px; text-align: center; border: 1px solid #444; }
+        .fc-badge { font-weight: bold; color: #00a884; font-size: 1.2rem; }
     </style>
 </head>
 <body>
 
 <div id="chat-container">
-    <div id="header">Chat</div>
+    <div id="header" id="chat-title">Chat System</div>
     
-    <div id="setup-area">
-        <p style="text-align: center; font-weight: bold;">Registrierung / Login</p>
+    <!-- SCHRITT 1: REGISTRIERUNG / LOGIN -->
+    <div id="login-area" class="area">
+        <p style="text-align: center; font-weight: bold; font-size: 1.2rem;">Schritt 1: Registrieren / Einloggen</p>
         
-        <p style="font-size: 0.9rem; color: #aaa;">Deine Ziffern für den Friend Code (6 bis 9 Zahlen):</p>
+        <p style="font-size: 0.9rem; color: #aaa;">Erstelle deine eigene Friend-Code-Nummer (6 bis 9 Zahlen):</p>
         <div style="display: flex; align-items: center; gap: 5px;">
             <input type="number" id="my-fc-number" placeholder="Z.B. 555666" min="100000" max="999999999">
-            <span style="font-weight: bold; font-size: 1.2rem; color: #00a884;">.fc</span>
+            <span class="fc-badge">.fc</span>
         </div>
 
         <p style="font-size: 0.9rem; color: #aaa;">Dein Name im Chat:</p>
         <input type="text" id="username" placeholder="Dein Name...">
 
-        <hr style="border-color: #444; margin: 10px 0;">
+        <div id="login-error" class="error"></div>
+        <button onclick="registerAndLogin()">Registrieren / Einloggen</button>
+    </div>
 
-        <p style="font-size: 0.9rem; color: #aaa;">Zahlen-Code des Freundes:</p>
+    <!-- SCHRITT 2: FREUND HINZUFÜGEN (Erst nach Login sichtbar) -->
+    <div id="connect-area" class="area">
+        <p style="text-align: center; font-weight: bold; font-size: 1.2rem;">Schritt 2: Verbindung herstellen</p>
+        
+        <div class="info-box">
+            <p>Dein registrierter Friend Code lautet:</p>
+            <p style="margin-top: 5px;"><span id="display-my-fc" style="font-family: monospace; font-size: 1.3rem; color: #00a884; font-weight: bold;"></span><span style="font-weight: bold; color: #aaa;">.fc</span></p>
+            <p style="font-size: 0.8rem; color: #aaa; margin-top: 5px;">Gib diese Nummer deinem Freund!</p>
+        </div>
+
+        <p style="font-size: 0.9rem; color: #aaa; margin-top: 10px;">Trage hier die Nummer deines Freundes ein:</p>
         <div style="display: flex; align-items: center; gap: 5px;">
-            <input type="number" id="friend-fc-number" placeholder="Code des Freundes...">
+            <input type="number" id="friend-fc-number" placeholder="Nummer des Freundes...">
             <span style="font-weight: bold; font-size: 1.2rem; color: #555;">.fc</span>
         </div>
 
-        <div id="setup-error" class="error"></div>
-        <button id="join-btn" onclick="startChat()">Registrieren & Verbinden</button>
+        <div id="connect-error" class="error"></div>
+        <button id="connect-btn" onclick="connectToFriend()">Mit Freund verbinden</button>
     </div>
 
-    <div id="chat-area">
+    <!-- SCHRITT 3: DER EIGENTLICHE CHAT -->
+    <div id="chat-area" class="area" style="padding: 0;">
         <div id="messages"></div>
         <div id="input-area">
             <input type="text" id="message-input" placeholder="Nachricht..." onkeypress="checkEnter(event)">
@@ -62,45 +81,99 @@
 </div>
 
 <script>
-    // Ein öffentlicher, stabiler Open-Source Cloud-Speicher (Pantry)
     const PANTRY_ID = "6fb148ef-c081-424a-b9c1-adfe0de531bb"; 
-    let myRoom = "";
+    let myFc = "";
     let myName = "";
+    let friendFc = "";
+    let myRoom = "";
     let chatMessages = [];
     let pollInterval = null;
 
-    function startChat() {
-        const myFc = document.getElementById('my-fc-number').value.trim();
+    // Schritt 1: Lokale Registrierung im Browser
+    function registerAndLogin() {
+        myFc = document.getElementById('my-fc-number').value.trim();
         myName = document.getElementById('username').value.trim();
-        const friendFc = document.getElementById('friend-fc-number').value.trim();
-        const errorDiv = document.getElementById('setup-error');
+        const errorDiv = document.getElementById('login-error');
 
         errorDiv.style.display = "none";
 
-        if (myFc.length < 6 || myFc.length > 9 || friendFc.length < 6 || friendFc.length > 9) {
-            errorDiv.innerText = "Fehler: Die Zahlen müssen zwischen 6 and 9 Stellen lang sein!";
+        if (myFc.length < 6 || myFc.length > 9) {
+            errorDiv.innerText = "Fehler: Deine Nummer muss zwischen 6 und 9 Stellen lang sein!";
             errorDiv.style.display = "block";
             return;
         }
 
         if (!myName) {
-            errorDiv.innerText = "Bitte gib deinen Namen ein!";
+            errorDiv.innerText = "Bitte gib einen Namen ein!";
             errorDiv.style.display = "block";
             return;
         }
 
-        // Erstellt aus beiden Ziffern-Kombinationen einen eindeutigen Raumnamen
+        // Zeige deinen Code im zweiten Schritt an
+        document.getElementById('display-my-fc').innerText = myFc;
+
+        // Schalte um zu Schritt 2
+        document.getElementById('login-area').style.display = 'none';
+        document.getElementById('connect-area').style.display = 'flex';
+        document.getElementById('header').innerText = `Eingeloggt als: ${myName}`;
+    }
+
+    // Schritt 2: Code des Freundes eingeben und Raum betreten
+    function connectToFriend() {
+        friendFc = document.getElementById('friend-fc-number').value.trim();
+        const errorDiv = document.getElementById('connect-error');
+
+        errorDiv.style.display = "none";
+
+        if (friendFc.length < 6 || friendFc.length > 9) {
+            errorDiv.innerText = "Fehler: Die Nummer des Freundes muss zwischen 6 und 9 Stellen lang sein!";
+            errorDiv.style.display = "block";
+            return;
+        }
+
+        if (friendFc === myFc) {
+            errorDiv.innerText = "Fehler: Du kannst dich nicht mit dir selbst verbinden!";
+            errorDiv.style.display = "block";
+            return;
+        }
+
+        document.getElementById('connect-btn').innerText = "Verbinde mit Raum...";
+
+        // Berechne den gemeinsamen Raumnamen (immer identisch, egal wer zuerst klickt)
         const sortedCodes = [myFc, friendFc].sort().join("x");
         myRoom = "room" + sortedCodes;
 
-        document.getElementById('setup-area').style.display = 'none';
-        document.getElementById('chat-area').style.display = 'flex';
+        // Prüfen, ob der Raum existiert, ansonsten leer in der Cloud anlegen
+        fetch(`https://getpantry.cloud{PANTRY_ID}/basket/${myRoom}`)
+        .then(res => {
+            if (!res.ok) {
+                return fetch(`https://getpantry.cloud{PANTRY_ID}/basket/${myRoom}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ messages: [] })
+                });
+            }
+            return res;
+        })
+        .then(() => {
+            // Schalte um zum Chat-Fenster
+            document.getElementById('connect-area').style.display = 'none';
+            document.getElementById('chat-area').style.display = 'flex';
+            document.getElementById('header').innerText = `Chat mit ${friendFc}.fc`;
 
-        // Holt alte Nachrichten und startet den Live-Abruf (alle 2 Sekunden)
-        getMessages();
-        pollInterval = setInterval(getMessages, 2000);
+            // Starte die automatische Abfrage alle 2 Sekunden
+            getMessages();
+            pollInterval = setInterval(getMessages, 2000);
+        })
+        .catch(err => {
+            console.error(err);
+            errorDiv.innerText = "Verbindungsfehler. Bitte versuche es noch einmal.";
+            errorDiv.style.display = "block";
+            document.getElementById('connect-btn').innerText = "Mit Freund verbinden";
+        });
     }
 
+    // Schritt 3: Nachrichten senden und empfangen
     function sendMessage() {
         const input = document.getElementById('message-input');
         const text = input.value.trim();
@@ -113,30 +186,23 @@
         };
 
         chatMessages.push(newMsg);
+        renderMessages();
+        input.value = '';
 
-        // Paket absenden und direkt in die Cloud schreiben
         fetch(`https://getpantry.cloud{PANTRY_ID}/basket/${myRoom}`, {
-            method: 'POST',
+            method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ messages: chatMessages })
-        })
-        .then(() => {
-            input.value = '';
-            renderMessages();
         })
         .catch(err => console.error("Sende-Fehler:", err));
     }
 
     function getMessages() {
         fetch(`https://getpantry.cloud{PANTRY_ID}/basket/${myRoom}`)
-        .then(res => {
-            if (!res.ok) return { messages: [] }; // Falls der Raum neu ist
-            return res.json();
-        })
+        .then(res => res.json())
         .then(data => {
             if (data && data.messages) {
-                // Nur updaten, wenn es neue Nachrichten im Browser gibt
-                if (data.messages.length > chatMessages.length) {
+                if (data.messages.length !== chatMessages.length) {
                     chatMessages = data.messages;
                     renderMessages();
                 }
@@ -165,4 +231,3 @@
 </script>
 
 </body>
-</html>
