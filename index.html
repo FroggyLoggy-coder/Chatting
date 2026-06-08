@@ -8,55 +8,51 @@
         * { box-sizing: border-box; margin: 0; padding: 0; font-family: sans-serif; }
         body { display: flex; justify-content: center; align-items: center; height: 100vh; background-color: #111; color: #fff; }
         #chat-container { width: 100%; max-width: 500px; height: 90vh; background: #222; display: flex; flex-direction: column; border-radius: 8px; overflow: hidden; }
-        #header { background: #333; padding: 15px; text-align: center; font-weight: bold; border-bottom: 1px solid #444; }
+        #header { background: #333; padding: 15px; text-align: center; font-weight: bold; border-bottom: 1px solid #444; display: flex; justify-content: space-between; align-items: center; }
+        #back-btn { background: none; color: #00a884; font-size: 1rem; display: none; }
         .area { padding: 20px; display: flex; flex-direction: column; gap: 15px; justify-content: center; height: 100%; }
-        #connect-area, #chat-area { display: none; }
+        #list-area, #chat-area { display: none; padding: 0; }
+        #chat-list { display: flex; flex-direction: column; height: 100%; overflow-y: auto; }
+        .chat-item { display: flex; align-items: center; gap: 15px; padding: 15px; border-bottom: 1px solid #333; cursor: pointer; transition: 0.2s; }
+        .chat-item:hover { background: #2a2a2a; }
+        .chat-avatar { width: 45px; height: 45px; background: #444; border-radius: 50%; display: flex; justify-content: center; align-items: center; font-size: 1.2rem; }
+        .chat-info { flex: 1; }
+        .chat-name { font-weight: bold; font-size: 1rem; }
         #messages { flex: 1; padding: 20px; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; background: #111; }
         .msg { max-width: 80%; padding: 10px; border-radius: 8px; word-wrap: break-word; line-height: 1.4; }
         .msg.sent { background-color: #005c4b; align-self: flex-end; }
         .msg.received { background-color: #333; align-self: flex-start; }
-        .msg.ai { background-color: #0284c7; align-self: flex-start; }
         #input-area { padding: 15px; background: #333; display: flex; gap: 10px; }
         input, button { padding: 12px; border: none; border-radius: 6px; font-size: 1rem; }
         input { background: #444; color: #fff; width: 100%; }
         input:focus { outline: none; }
         button { background: #00a884; color: white; cursor: pointer; font-weight: bold; }
         .error { color: #ff4a4a; font-size: 0.9rem; text-align: center; display: none; }
-        .info-box { background: #333; padding: 12px; border-radius: 6px; text-align: center; border: 1px solid #444; }
-        .fc-badge { font-weight: bold; color: #00a884; font-size: 1.2rem; }
     </style>
 </head>
 <body>
 <div id="chat-container">
-    <div id="header">Chat System</div>
+    <div id="header">
+        <button id="back-btn" onclick="showChatList()">‹ Zurück</button>
+        <span id="header-title">Registrieren</span>
+        <span style="width: 50px;"></span>
+    </div>
     <div id="login-area" class="area">
-        <p style="text-align: center; font-weight: bold; font-size: 1.2rem;">Schritt 1: Registrieren / Einloggen</p>
-        <p style="font-size: 0.9rem; color: #aaa;">Wähle deine Friend-Code-Nummer (6 bis 9 Zahlen):</p>
-        <div style="display: flex; align-items: center; gap: 5px;">
-            <input type="number" id="my-fc-number" placeholder="Z.B. 555666" min="100000" max="999999999">
-            <span class="fc-badge">.fc</span>
-        </div>
+        <p style="font-size: 0.9rem; color: #aaa;">Wähle deine eigene Nummer (6 bis 9 Zahlen):</p>
+        <input type="number" id="my-fc-number" placeholder="Deine Nummer...">
         <p style="font-size: 0.9rem; color: #aaa;">Dein Name im Chat:</p>
         <input type="text" id="username" placeholder="Dein Name...">
         <div id="login-error" class="error"></div>
         <button onclick="registerAndLogin()">Registrieren</button>
     </div>
-    <div id="connect-area" class="area">
-        <p style="text-align: center; font-weight: bold; font-size: 1.2rem;">Schritt 2: Verbinden</p>
-        <div class="info-box">
-            <p>Dein registrierter Friend Code lautet:</p>
-            <p style="margin-top: 5px;"><span id="display-my-fc" style="font-family: monospace; font-size: 1.3rem; color: #00a884; font-weight: bold;"></span><span style="font-weight: bold; color: #aaa;">.fc</span></p>
-            <p style="font-size: 0.8rem; color: #aaa; margin-top: 5px;">Tippe die "19" ein, um mit der intelligenten KI zu chatten.</p>
+    <div id="list-area" class="area">
+        <div style="padding: 15px; display: flex; gap: 10px; border-bottom: 1px solid #333;">
+            <input type="number" id="new-friend-fc" placeholder="Freund-Nummer hinzufügen...">
+            <button onclick="addFriendChat()">+</button>
         </div>
-        <p style="font-size: 0.9rem; color: #aaa; margin-top: 10px;">Trage hier die Nummer deines Freundes ein:</p>
-        <div style="display: flex; align-items: center; gap: 5px;">
-            <input type="number" id="friend-fc-number" placeholder="Code oder 19 eingeben...">
-            <span style="font-weight: bold; font-size: 1.2rem; color: #555;">.fc</span>
-        </div>
-        <div id="connect-error" class="error"></div>
-        <button id="connect-btn" onclick="connectToFriend()">Chat starten</button>
+        <div id="chat-list"></div>
     </div>
-    <div id="chat-area" class="area" style="padding: 0;">
+    <div id="chat-area" class="area">
         <div id="messages"></div>
         <div id="input-area">
             <input type="text" id="message-input" placeholder="Nachricht..." onkeypress="checkEnter(event)">
@@ -67,133 +63,90 @@
 <script>
     let myFc = "";
     let myName = "";
-    let friendFc = "";
-    let myRoom = "";
-    let chatMessages = [];
-    let pollInterval = null;
-    let isSelfChat = false;
-    let isAiChat = false;
+    let activeChatId = "";
+    let chats = {};
     function registerAndLogin() {
         myFc = document.getElementById('my-fc-number').value.trim();
         myName = document.getElementById('username').value.trim();
         const errorDiv = document.getElementById('login-error');
-        errorDiv.style.display = "none";
-        if (myFc.length < 6 || myFc.length > 9) {
-            errorDiv.innerText = "Fehler: Die Nummer muss zwischen 6 und 9 Stellen lang sein!";
+        if (myFc.length < 6 || myFc.length > 9 || !myName) {
+            errorDiv.innerText = "Fehler: Ungültige Daten!";
             errorDiv.style.display = "block";
             return;
         }
-        if (!myName) {
-            errorDiv.innerText = "Bitte gib einen Namen ein!";
-            errorDiv.style.display = "block";
-            return;
-        }
-        document.getElementById('display-my-fc').innerText = myFc;
-        document.getElementById('login-area').style.display = 'none';
-        document.getElementById('connect-area').style.display = 'flex';
-        document.getElementById('header').innerText = `Eingeloggt als: ${myName}`;
+        chats["self_" + myFc] = { name: "Notiz an mich", isSelf: true, messages: [], avatar: "📝" };
+        loadSavedChats();
+        showChatList();
     }
-    function connectToFriend() {
-        friendFc = document.getElementById('friend-fc-number').value.trim();
-        const errorDiv = document.getElementById('connect-error');
-        errorDiv.style.display = "none";
-        if (friendFc === "19") {
-            isAiChat = true;
-            isSelfChat = false;
-            document.getElementById('header').innerText = `🤖 Ultra-Intelligente KI`;
-            document.getElementById('connect-area').style.display = 'none';
-            document.getElementById('chat-area').style.display = 'flex';
-            displayMessage("KI", "Hallo! Ich bin deine hochentwickelte KI-Assistentin. Wie kann ich dir heute helfen? Frag mich alles!", "ai");
-            return;
+    function showChatList() {
+        document.getElementById('login-area').style.display = 'none';
+        document.getElementById('chat-area').style.display = 'none';
+        document.getElementById('back-btn').style.display = 'none';
+        document.getElementById('list-area').style.display = 'flex';
+        document.getElementById('header-title').innerText = "Chats";
+        renderChatList();
+    }
+    function renderChatList() {
+        const listDiv = document.getElementById('chat-list');
+        listDiv.innerHTML = "";
+        Object.keys(chats).forEach(id => {
+            const chat = chats[id];
+            const item = document.createElement('div');
+            item.classList.add('chat-item');
+            item.onclick = () => openChat(id);
+            item.innerHTML = `<div class="chat-avatar">${chat.avatar}</div><div class="chat-info"><div class="chat-name">${chat.name}</div></div>`;
+            listDiv.appendChild(item);
+        });
+    }
+    function addFriendChat() {
+        const friendFc = document.getElementById('new-friend-fc').value.trim();
+        if (friendFc.length < 6 || friendFc.length > 9 || friendFc === myFc) return;
+        const chatId = "friend_" + friendFc;
+        if (!chats[chatId]) {
+            chats[chatId] = { name: friendFc + ".fc", isSelf: false, messages: [], avatar: "👤" };
+            saveChatsToStorage();
+            renderChatList();
         }
-        if (friendFc.length < 6 || friendFc.length > 9) {
-            errorDiv.innerText = "Fehler: Die Nummer muss zwischen 6 und 9 Stellen lang sein!";
-            errorDiv.style.display = "block";
-            return;
-        }
-        isAiChat = false;
-        if (friendFc === myFc) {
-            isSelfChat = true;
-            myRoom = "self_" + myFc;
-            document.getElementById('header').innerText = `Privater Chat (Notizen)`;
-        } else {
-            isSelfChat = false;
-            const sortedCodes = [myFc, friendFc].sort().join("x");
-            myRoom = sortedCodes;
-            document.getElementById('header').innerText = `Chat mit ${friendFc}.fc`;
-        }
-        document.getElementById('connect-area').style.display = 'none';
+        document.getElementById('new-friend-fc').value = "";
+    }
+    function openChat(id) {
+        activeChatId = id;
+        document.getElementById('list-area').style.display = 'none';
         document.getElementById('chat-area').style.display = 'flex';
-        getMessages();
-        pollInterval = setInterval(getMessages, 2000);
+        document.getElementById('back-btn').style.display = 'block';
+        document.getElementById('header-title').innerText = chats[id].name;
+        renderMessages();
     }
     function sendMessage() {
         const input = document.getElementById('message-input');
         const text = input.value.trim();
-        if (!text) return;
-        displayMessage(myName, text, "sent");
+        if (!text || !activeChatId) return;
+        chats[activeChatId].messages.push({ sender: myName, text: text });
+        saveChatsToStorage();
+        renderMessages();
         input.value = '';
-        if (isAiChat) {
-            fetchAiResponse(text);
-            return;
-        }
-        const newMsg = { sender: myName, text: text, time: Date.now() };
-        chatMessages.push(newMsg);
-        fetch(`https://jsonbin.io`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'X-Bin-Name': myRoom,
-                'X-Bin-Private': 'false'
-            },
-            body: JSON.stringify({ messages: chatMessages })
-        })
-        .catch(err => console.error("Sende-Fehler:", err));
     }
-    function fetchAiResponse(userText) {
+    function renderMessages() {
         const messagesDiv = document.getElementById('messages');
-        const typingIndicator = document.createElement('div');
-        typingIndicator.id = "ai-typing";
-        typingIndicator.classList.add("msg", "ai");
-        typingIndicator.innerText = "🤖 KI überlegt...";
-        messagesDiv.appendChild(typingIndicator);
-        messagesDiv.scrollTop = messagesDiv.scrollHeight;
-        fetch(`https://pollinations.ai{encodeURIComponent(userText)}?model=llama`)
-        .then(res => res.text())
-        .then(aiResponseText => {
-            const indicator = document.getElementById("ai-typing");
-            if (indicator) indicator.remove();
-            displayMessage("KI", aiResponseText, "ai");
-        })
-        .catch(err => {
-            const indicator = document.getElementById("ai-typing");
-            if (indicator) indicator.remove();
-            displayMessage("KI", "Entschuldigung, mein Server ist gerade überlastet. Bitte versuche es gleich noch einmal!", "ai");
-            console.error("KI-Fehler:", err);
+        messagesDiv.innerHTML = "";
+        const currentChat = chats[activeChatId];
+        currentChat.messages.forEach(msg => {
+            const type = (currentChat.isSelf || msg.sender === myName) ? 'sent' : 'received';
+            const msgElement = document.createElement('div');
+            msgElement.classList.add('msg', type);
+            msgElement.innerText = text = msg.text;
+            messagesDiv.appendChild(msgElement);
         });
+        messagesDiv.scrollTop = messagesDiv.scrollHeight;
     }
-    function getMessages() {
-        if (isAiChat) return;
-        fetch(`https://jsonbin.io/latest?name=${myRoom}`)
-        .then(res => {
-            if (!res.ok) return { record: { messages: [] } };
-            return res.json();
-        })
-        .then(data => {
-            if (data && data.record && data.record.messages) {
-                if (data.record.messages.length > chatMessages.length) {
-                    chatMessages = data.record.messages;
-                    const messagesDiv = document.getElementById('messages');
-                    messagesDiv.innerHTML = "";
-                    chatMessages.forEach(msg => {
-                        const type = (isSelfChat || msg.sender === myName) ? 'sent' : 'received';
-                        displayMessage(msg.sender, msg.text, type);
-                    });
-                }
-            }
-        })
-        .catch(err => console.error("Lade-Fehler:", err));
+    function saveChatsToStorage() {
+        localStorage.setItem('stored_chats_' + myFc, JSON.stringify(chats));
     }
-    function displayMessage(sender, text, type) {
-    
-const messagesDiv = document.getElementById('messages');const msgElement = document.createElement('div');msgElement.classList.add('msg', type);if (type === 'ai') {msgElement.innerText = "🤖 KI: " + text;} else {msgElement.innerText = (type === 'received' ? sender + ": " : "") + text;}messagesDiv.appendChild(msgElement);messagesDiv.scrollTop = messagesDiv.scrollHeight;}function checkEnter(event) {if (event.key === 'Enter') { sendMessage(); }}
+    function loadSavedChats() {
+        const saved = localStorage.getItem('stored_chats_' + myFc);
+        if (saved) { chats = JSON.parse(saved); }
+    }
+    function checkEnter(event) { if (event.key === 'Enter') { sendMessage(); } }
+</script>
+</body>
+</html>
