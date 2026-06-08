@@ -31,9 +31,9 @@
     <div id="setup-area">
         <p style="text-align: center; font-weight: bold;">Registrierung / Login</p>
         
-        <p style="font-size: 0.9rem; color: #aaa;">Gib deine gewünschte Friend-Code-Zahl ein (6 bis 9 Ziffern):</p>
+        <p style="font-size: 0.9rem; color: #aaa;">Deine Ziffern für den Friend Code (6 bis 9 Zahlen):</p>
         <div style="display: flex; align-items: center; gap: 5px;">
-            <input type="number" id="my-fc-number" placeholder="z.B. 123456" min="100000" max="999999999">
+            <input type="number" id="my-fc-number" placeholder="Z.B. 555666" min="100000" max="999999999">
             <span style="font-weight: bold; font-size: 1.2rem; color: #00a884;">.fc</span>
         </div>
 
@@ -42,14 +42,14 @@
 
         <hr style="border-color: #444; margin: 10px 0;">
 
-        <p style="font-size: 0.9rem; color: #aaa;">Friend Code des Freundes (Zahl eingeben):</p>
+        <p style="font-size: 0.9rem; color: #aaa;">Zahlen-Code des Freundes:</p>
         <div style="display: flex; align-items: center; gap: 5px;">
             <input type="number" id="friend-fc-number" placeholder="Code des Freundes...">
-            <span style="font-weight: bold; font-size: 1.2rem; color: #333;">.fc</span>
+            <span style="font-weight: bold; font-size: 1.2rem; color: #555;">.fc</span>
         </div>
 
         <div id="setup-error" class="error"></div>
-        <button onclick="startChat()">Registrieren & Verbinden</button>
+        <button id="join-btn" onclick="startChat()">Registrieren & Verbinden</button>
     </div>
 
     <div id="chat-area">
@@ -62,9 +62,11 @@
 </div>
 
 <script>
+    // Ein öffentlicher, stabiler Open-Source Cloud-Speicher (Pantry)
+    const PANTRY_ID = "6fb148ef-c081-424a-b9c1-adfe0de531bb"; 
     let myRoom = "";
     let myName = "";
-    let lastTimestamp = 0;
+    let chatMessages = [];
     let pollInterval = null;
 
     function startChat() {
@@ -75,9 +77,8 @@
 
         errorDiv.style.display = "none";
 
-        // Überprüfung der Länge (Mehr als 5, weniger als 10 Zeichen)
         if (myFc.length < 6 || myFc.length > 9 || friendFc.length < 6 || friendFc.length > 9) {
-            errorDiv.innerText = "Fehler: Die Zahlen müssen zwischen 6 und 9 Stellen lang sein!";
+            errorDiv.innerText = "Fehler: Die Zahlen müssen zwischen 6 and 9 Stellen lang sein!";
             errorDiv.style.display = "block";
             return;
         }
@@ -88,14 +89,14 @@
             return;
         }
 
-        // Raum-ID wird aus beiden Codes generiert, damit beide im selben Raum landen
-        const codes = [myFc, friendFc].sort();
-        myRoom = "room_" + codes[0] + "_" + codes[1];
+        // Erstellt aus beiden Ziffern-Kombinationen einen eindeutigen Raumnamen
+        const sortedCodes = [myFc, friendFc].sort().join("x");
+        myRoom = "room" + sortedCodes;
 
         document.getElementById('setup-area').style.display = 'none';
         document.getElementById('chat-area').style.display = 'flex';
 
-        // Nachrichten-Abfrage alle 2 Sekunden starten (ohne Lade-Hänger)
+        // Holt alte Nachrichten und startet den Live-Abruf (alle 2 Sekunden)
         getMessages();
         pollInterval = setInterval(getMessages, 2000);
     }
@@ -103,55 +104,59 @@
     function sendMessage() {
         const input = document.getElementById('message-input');
         const text = input.value.trim();
-        
         if (!text) return;
 
-        const msgData = {
+        const newMsg = {
             sender: myName,
             text: text,
-            timestamp: Date.now()
+            time: Date.now()
         };
 
-        // Speichern über eine freie, universelle KV-Repository-API
-        fetch(`https://p3k.io{myRoom}`, {
+        chatMessages.push(newMsg);
+
+        // Paket absenden und direkt in die Cloud schreiben
+        fetch(`https://getpantry.cloud{PANTRY_ID}/basket/${myRoom}`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(msgData)
+            body: JSON.stringify({ messages: chatMessages })
         })
         .then(() => {
             input.value = '';
-            getMessages();
+            renderMessages();
         })
         .catch(err => console.error("Sende-Fehler:", err));
     }
 
     function getMessages() {
-        fetch(`https://p3k.io{myRoom}`)
-        .then(response => {
-            if (response.status === 404) return [];
-            return response.json();
+        fetch(`https://getpantry.cloud{PANTRY_ID}/basket/${myRoom}`)
+        .then(res => {
+            if (!res.ok) return { messages: [] }; // Falls der Raum neu ist
+            return res.json();
         })
         .then(data => {
-            // Falls die API ein einzelnes Objekt liefert, machen wir ein Array daraus
-            const messages = Array.isArray(data) ? data : [data];
-            const messagesDiv = document.getElementById('messages');
-            
-            // Nur aktualisieren, wenn neue Nachrichten da sind
-            if (messages.length > 0) {
-                messagesDiv.innerHTML = "";
-                messages.forEach(msg => {
-                    if (msg.sender && msg.text) {
-                        const type = (msg.sender === myName) ? 'sent' : 'received';
-                        const msgElement = document.createElement('div');
-                        msgElement.classList.add('msg', type);
-                        msgElement.innerText = (type === 'received' ? msg.sender + ": " : "") + msg.text;
-                        messagesDiv.appendChild(msgElement);
-                    }
-                });
-                messagesDiv.scrollTop = messagesDiv.scrollHeight;
+            if (data && data.messages) {
+                // Nur updaten, wenn es neue Nachrichten im Browser gibt
+                if (data.messages.length > chatMessages.length) {
+                    chatMessages = data.messages;
+                    renderMessages();
+                }
             }
         })
         .catch(err => console.error("Lade-Fehler:", err));
+    }
+
+    function renderMessages() {
+        const messagesDiv = document.getElementById('messages');
+        messagesDiv.innerHTML = "";
+
+        chatMessages.forEach(msg => {
+            const type = (msg.sender === myName) ? 'sent' : 'received';
+            const msgElement = document.createElement('div');
+            msgElement.classList.add('msg', type);
+            msgElement.innerText = (type === 'received' ? msg.sender + ": " : "") + msg.text;
+            messagesDiv.appendChild(msgElement);
+        });
+        messagesDiv.scrollTop = messagesDiv.scrollHeight;
     }
 
     function checkEnter(event) {
