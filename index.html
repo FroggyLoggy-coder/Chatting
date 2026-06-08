@@ -10,7 +10,6 @@
         #chat-container { width: 100%; max-width: 500px; height: 90vh; background: #222; display: flex; flex-direction: column; border-radius: 8px; overflow: hidden; }
         #header { background: #333; padding: 15px; text-align: center; font-weight: bold; border-bottom: 1px solid #444; }
         
-        /* Die drei verschiedenen Bereiche */
         .area { padding: 20px; display: flex; flex-direction: column; gap: 15px; justify-content: center; height: 100%; }
         #connect-area, #chat-area { display: none; }
         
@@ -31,13 +30,13 @@
 <body>
 
 <div id="chat-container">
-    <div id="header" id="chat-title">Chat System</div>
+    <div id="header">Chat System</div>
     
-    <!-- SCHRITT 1: REGISTRIERUNG / LOGIN -->
+    <!-- SCHRITT 1: REGISTRIERUNG -->
     <div id="login-area" class="area">
         <p style="text-align: center; font-weight: bold; font-size: 1.2rem;">Schritt 1: Registrieren / Einloggen</p>
         
-        <p style="font-size: 0.9rem; color: #aaa;">Erstelle deine eigene Friend-Code-Nummer (6 bis 9 Zahlen):</p>
+        <p style="font-size: 0.9rem; color: #aaa;">Wähle deine Friend-Code-Nummer (6 bis 9 Zahlen):</p>
         <div style="display: flex; align-items: center; gap: 5px;">
             <input type="number" id="my-fc-number" placeholder="Z.B. 555666" min="100000" max="999999999">
             <span class="fc-badge">.fc</span>
@@ -47,30 +46,30 @@
         <input type="text" id="username" placeholder="Dein Name...">
 
         <div id="login-error" class="error"></div>
-        <button onclick="registerAndLogin()">Registrieren / Einloggen</button>
+        <button onclick="registerAndLogin()">Registrieren</button>
     </div>
 
-    <!-- SCHRITT 2: FREUND HINZUFÜGEN (Erst nach Login sichtbar) -->
+    <!-- SCHRITT 2: VERBINDEN -->
     <div id="connect-area" class="area">
-        <p style="text-align: center; font-weight: bold; font-size: 1.2rem;">Schritt 2: Verbindung herstellen</p>
+        <p style="text-align: center; font-weight: bold; font-size: 1.2rem;">Schritt 2: Verbinden</p>
         
         <div class="info-box">
             <p>Dein registrierter Friend Code lautet:</p>
             <p style="margin-top: 5px;"><span id="display-my-fc" style="font-family: monospace; font-size: 1.3rem; color: #00a884; font-weight: bold;"></span><span style="font-weight: bold; color: #aaa;">.fc</span></p>
-            <p style="font-size: 0.8rem; color: #aaa; margin-top: 5px;">Gib diese Nummer deinem Freund!</p>
+            <p style="font-size: 0.8rem; color: #aaa; margin-top: 5px;">Tippe deine eigene Nummer ein, um einen privaten Chat mit dir selbst zu starten.</p>
         </div>
 
-        <p style="font-size: 0.9rem; color: #aaa; margin-top: 10px;">Trage hier die Nummer deines Freundes ein:</p>
+        <p style="font-size: 0.9rem; color: #aaa; margin-top: 10px;">Trage hier die Nummer deines Freundes (oder deine eigene) ein:</p>
         <div style="display: flex; align-items: center; gap: 5px;">
-            <input type="number" id="friend-fc-number" placeholder="Nummer des Freundes...">
+            <input type="number" id="friend-fc-number" placeholder="Code eingeben...">
             <span style="font-weight: bold; font-size: 1.2rem; color: #555;">.fc</span>
         </div>
 
         <div id="connect-error" class="error"></div>
-        <button id="connect-btn" onclick="connectToFriend()">Mit Freund verbinden</button>
+        <button id="connect-btn" onclick="connectToFriend()">Chat starten</button>
     </div>
 
-    <!-- SCHRITT 3: DER EIGENTLICHE CHAT -->
+    <!-- SCHRITT 3: CHATFENSTER -->
     <div id="chat-area" class="area" style="padding: 0;">
         <div id="messages"></div>
         <div id="input-area">
@@ -81,15 +80,14 @@
 </div>
 
 <script>
-    const PANTRY_ID = "6fb148ef-c081-424a-b9c1-adfe0de531bb"; 
     let myFc = "";
     let myName = "";
     let friendFc = "";
     let myRoom = "";
     let chatMessages = [];
     let pollInterval = null;
+    let isSelfChat = false;
 
-    // Schritt 1: Lokale Registrierung im Browser
     function registerAndLogin() {
         myFc = document.getElementById('my-fc-number').value.trim();
         myName = document.getElementById('username').value.trim();
@@ -98,7 +96,7 @@
         errorDiv.style.display = "none";
 
         if (myFc.length < 6 || myFc.length > 9) {
-            errorDiv.innerText = "Fehler: Deine Nummer muss zwischen 6 und 9 Stellen lang sein!";
+            errorDiv.innerText = "Fehler: Die Nummer muss zwischen 6 und 9 Stellen lang sein!";
             errorDiv.style.display = "block";
             return;
         }
@@ -109,16 +107,12 @@
             return;
         }
 
-        // Zeige deinen Code im zweiten Schritt an
         document.getElementById('display-my-fc').innerText = myFc;
-
-        // Schalte um zu Schritt 2
         document.getElementById('login-area').style.display = 'none';
         document.getElementById('connect-area').style.display = 'flex';
         document.getElementById('header').innerText = `Eingeloggt als: ${myName}`;
     }
 
-    // Schritt 2: Code des Freundes eingeben und Raum betreten
     function connectToFriend() {
         friendFc = document.getElementById('friend-fc-number').value.trim();
         const errorDiv = document.getElementById('connect-error');
@@ -126,54 +120,31 @@
         errorDiv.style.display = "none";
 
         if (friendFc.length < 6 || friendFc.length > 9) {
-            errorDiv.innerText = "Fehler: Die Nummer des Freundes muss zwischen 6 und 9 Stellen lang sein!";
+            errorDiv.innerText = "Fehler: Die Nummer muss zwischen 6 und 9 Stellen lang sein!";
             errorDiv.style.display = "block";
             return;
         }
 
+        // NEU: Erkennen, ob es ein Selbst-Chat ist
         if (friendFc === myFc) {
-            errorDiv.innerText = "Fehler: Du kannst dich nicht mit dir selbst verbinden!";
-            errorDiv.style.display = "block";
-            return;
+            isSelfChat = true;
+            myRoom = "self_" + myFc;
+            document.getElementById('header').innerText = `Privater Chat (Notizen)`;
+        } else {
+            isSelfChat = false;
+            const sortedCodes = [myFc, friendFc].sort().join("x");
+            myRoom = sortedCodes;
+            document.getElementById('header').innerText = `Chat mit ${friendFc}.fc`;
         }
 
-        document.getElementById('connect-btn').innerText = "Verbinde mit Raum...";
+        document.getElementById('connect-area').style.display = 'none';
+        document.getElementById('chat-area').style.display = 'flex';
 
-        // Berechne den gemeinsamen Raumnamen (immer identisch, egal wer zuerst klickt)
-        const sortedCodes = [myFc, friendFc].sort().join("x");
-        myRoom = "room" + sortedCodes;
-
-        // Prüfen, ob der Raum existiert, ansonsten leer in der Cloud anlegen
-        fetch(`https://getpantry.cloud{PANTRY_ID}/basket/${myRoom}`)
-        .then(res => {
-            if (!res.ok) {
-                return fetch(`https://getpantry.cloud{PANTRY_ID}/basket/${myRoom}`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ messages: [] })
-                });
-            }
-            return res;
-        })
-        .then(() => {
-            // Schalte um zum Chat-Fenster
-            document.getElementById('connect-area').style.display = 'none';
-            document.getElementById('chat-area').style.display = 'flex';
-            document.getElementById('header').innerText = `Chat mit ${friendFc}.fc`;
-
-            // Starte die automatische Abfrage alle 2 Sekunden
-            getMessages();
-            pollInterval = setInterval(getMessages, 2000);
-        })
-        .catch(err => {
-            console.error(err);
-            errorDiv.innerText = "Verbindungsfehler. Bitte versuche es noch einmal.";
-            errorDiv.style.display = "block";
-            document.getElementById('connect-btn').innerText = "Mit Freund verbinden";
-        });
+        // Nachrichten-Abfrage starten
+        getMessages();
+        pollInterval = setInterval(getMessages, 2000);
     }
 
-    // Schritt 3: Nachrichten senden und empfangen
     function sendMessage() {
         const input = document.getElementById('message-input');
         const text = input.value.trim();
@@ -189,21 +160,29 @@
         renderMessages();
         input.value = '';
 
-        fetch(`https://getpantry.cloud{PANTRY_ID}/basket/${myRoom}`, {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
+        // Hochladen über die Schnittstelle
+        fetch(`https://jsonbin.io`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-Bin-Name': myRoom,
+                'X-Bin-Private': 'false'
+            },
             body: JSON.stringify({ messages: chatMessages })
         })
         .catch(err => console.error("Sende-Fehler:", err));
     }
 
     function getMessages() {
-        fetch(`https://getpantry.cloud{PANTRY_ID}/basket/${myRoom}`)
-        .then(res => res.json())
+        fetch(`https://jsonbin.io/latest?name=${myRoom}`)
+        .then(res => {
+            if (!res.ok) return { record: { messages: [] } };
+            return res.json();
+        })
         .then(data => {
-            if (data && data.messages) {
-                if (data.messages.length !== chatMessages.length) {
-                    chatMessages = data.messages;
+            if (data && data.record && data.record.messages) {
+                if (data.record.messages.length > chatMessages.length) {
+                    chatMessages = data.record.messages;
                     renderMessages();
                 }
             }
@@ -216,10 +195,11 @@
         messagesDiv.innerHTML = "";
 
         chatMessages.forEach(msg => {
-            const type = (msg.sender === myName) ? 'sent' : 'received';
+            // Im Selbst-Chat sind alle Nachrichten grün (rechts), bei Freunden wird unterschieden
+            const type = (isSelfChat || msg.sender === myName) ? 'sent' : 'received';
             const msgElement = document.createElement('div');
             msgElement.classList.add('msg', type);
-            msgElement.innerText = (type === 'received' ? msg.sender + ": " : "") + msg.text;
+            msgElement.innerText = (!isSelfChat && type === 'received' ? msg.sender + ": " : "") + msg.text;
             messagesDiv.appendChild(msgElement);
         });
         messagesDiv.scrollTop = messagesDiv.scrollHeight;
@@ -231,3 +211,4 @@
 </script>
 
 </body>
+</html>
