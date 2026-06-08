@@ -14,9 +14,10 @@
         #connect-area, #chat-area { display: none; }
         
         #messages { flex: 1; padding: 20px; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; background: #111; }
-        .msg { max-width: 80%; padding: 10px; border-radius: 8px; word-wrap: break-word; }
+        .msg { max-width: 80%; padding: 10px; border-radius: 8px; word-wrap: break-word; line-height: 1.4; }
         .msg.sent { background-color: #005c4b; align-self: flex-end; }
         .msg.received { background-color: #333; align-self: flex-start; }
+        .msg.ai { background-color: #0284c7; align-self: flex-start; }
         #input-area { padding: 15px; background: #333; display: flex; gap: 10px; }
         input, button { padding: 12px; border: none; border-radius: 6px; font-size: 1rem; }
         input { background: #444; color: #fff; width: 100%; }
@@ -56,12 +57,12 @@
         <div class="info-box">
             <p>Dein registrierter Friend Code lautet:</p>
             <p style="margin-top: 5px;"><span id="display-my-fc" style="font-family: monospace; font-size: 1.3rem; color: #00a884; font-weight: bold;"></span><span style="font-weight: bold; color: #aaa;">.fc</span></p>
-            <p style="font-size: 0.8rem; color: #aaa; margin-top: 5px;">Tippe deine eigene Nummer ein, um einen privaten Chat mit dir selbst zu starten.</p>
+            <p style="font-size: 0.8rem; color: #aaa; margin-top: 5px;">Tippe die "19" ein, um mit der intelligenten KI zu chatten.</p>
         </div>
 
-        <p style="font-size: 0.9rem; color: #aaa; margin-top: 10px;">Trage hier die Nummer deines Freundes (oder deine eigene) ein:</p>
+        <p style="font-size: 0.9rem; color: #aaa; margin-top: 10px;">Trage hier die Nummer deines Freundes ein:</p>
         <div style="display: flex; align-items: center; gap: 5px;">
-            <input type="number" id="friend-fc-number" placeholder="Code eingeben...">
+            <input type="number" id="friend-fc-number" placeholder="Code oder 19 eingeben...">
             <span style="font-weight: bold; font-size: 1.2rem; color: #555;">.fc</span>
         </div>
 
@@ -87,6 +88,7 @@
     let chatMessages = [];
     let pollInterval = null;
     let isSelfChat = false;
+    let isAiChat = false;
 
     function registerAndLogin() {
         myFc = document.getElementById('my-fc-number').value.trim();
@@ -119,13 +121,27 @@
 
         errorDiv.style.display = "none";
 
+        // NEU: Spezialprüfung für den KI-Geheimcode "19"
+        if (friendFc === "19") {
+            isAiChat = true;
+            isSelfChat = false;
+            document.getElementById('header').innerText = `🤖 Ultra-Intelligente KI`;
+            document.getElementById('connect-area').style.display = 'none';
+            document.getElementById('chat-area').style.display = 'flex';
+            
+            // Begrüßung der KI simulieren
+            displayMessage("KI", "Hallo! Ich bin deine hochentwickelte KI-Assistentin. Wie kann ich dir heute helfen? Frag mich alles!", "ai");
+            return;
+        }
+
+        // Normale Längenprüfung für reguläre Freunde
         if (friendFc.length < 6 || friendFc.length > 9) {
             errorDiv.innerText = "Fehler: Die Nummer muss zwischen 6 und 9 Stellen lang sein!";
             errorDiv.style.display = "block";
             return;
         }
 
-        // NEU: Erkennen, ob es ein Selbst-Chat ist
+        isAiChat = false;
         if (friendFc === myFc) {
             isSelfChat = true;
             myRoom = "self_" + myFc;
@@ -140,7 +156,6 @@
         document.getElementById('connect-area').style.display = 'none';
         document.getElementById('chat-area').style.display = 'flex';
 
-        // Nachrichten-Abfrage starten
         getMessages();
         pollInterval = setInterval(getMessages, 2000);
     }
@@ -150,17 +165,19 @@
         const text = input.value.trim();
         if (!text) return;
 
-        const newMsg = {
-            sender: myName,
-            text: text,
-            time: Date.now()
-        };
-
-        chatMessages.push(newMsg);
-        renderMessages();
+        displayMessage(myName, text, "sent");
         input.value = '';
 
-        // Hochladen über die Schnittstelle
+        // Falls es der KI-Modus ist, leiten wir die Frage an das Sprachmodell weiter
+        if (isAiChat) {
+            fetchAiResponse(text);
+            return;
+        }
+
+        // Normaler Chat-Speicher für Freunde oder Selbst-Chat
+        const newMsg = { sender: myName, text: text, time: Date.now() };
+        chatMessages.push(newMsg);
+
         fetch(`https://jsonbin.io`, {
             method: 'POST',
             headers: {
@@ -173,42 +190,38 @@
         .catch(err => console.error("Sende-Fehler:", err));
     }
 
+    // NEU: Holt die Antwort von einem freien High-End-KI-Server (Llama 3)
+    function fetchAiResponse(userText) {
+        // Temporäre "Schreibt..." Nachricht anzeigen
+        const messagesDiv = document.getElementById('messages');
+        const typingIndicator = document.createElement('div');
+        typingIndicator.id = "ai-typing";
+        typingIndicator.classList.add("msg", "ai");
+        typingIndicator.innerText = "🤖 KI überlegt...";
+        messagesDiv.appendChild(typingIndicator);
+        messagesDiv.scrollTop = messagesDiv.scrollHeight;
+
+        // Anfrage an eine freie, serverlose KI-Schnittstelle senden
+        fetch(`https://pollinations.ai{encodeURIComponent(userText)}?model=llama`)
+        .then(res => res.text())
+        .then(aiResponseText => {
+            // "Schreibt..." entfernen und echte Antwort einblenden
+            const indicator = document.getElementById("ai-typing");
+            if (indicator) indicator.remove();
+            
+            displayMessage("KI", aiResponseText, "ai");
+        })
+        .catch(err => {
+            const indicator = document.getElementById("ai-typing");
+            if (indicator) indicator.remove();
+            displayMessage("KI", "Entschuldigung, mein Server ist gerade überlastet. Bitte versuche es gleich noch einmal!", "ai");
+            console.error("KI-Fehler:", err);
+        });
+    }
+
     function getMessages() {
+        if (isAiChat) return; // KI braucht keinen Cloud-Abruf
+        
         fetch(`https://jsonbin.io/latest?name=${myRoom}`)
         .then(res => {
-            if (!res.ok) return { record: { messages: [] } };
-            return res.json();
-        })
-        .then(data => {
-            if (data && data.record && data.record.messages) {
-                if (data.record.messages.length > chatMessages.length) {
-                    chatMessages = data.record.messages;
-                    renderMessages();
-                }
-            }
-        })
-        .catch(err => console.error("Lade-Fehler:", err));
-    }
-
-    function renderMessages() {
-        const messagesDiv = document.getElementById('messages');
-        messagesDiv.innerHTML = "";
-
-        chatMessages.forEach(msg => {
-            // Im Selbst-Chat sind alle Nachrichten grün (rechts), bei Freunden wird unterschieden
-            const type = (isSelfChat || msg.sender === myName) ? 'sent' : 'received';
-            const msgElement = document.createElement('div');
-            msgElement.classList.add('msg', type);
-            msgElement.innerText = (!isSelfChat && type === 'received' ? msg.sender + ": " : "") + msg.text;
-            messagesDiv.appendChild(msgElement);
-        });
-        messagesDiv.scrollTop = messagesDiv.scrollHeight;
-    }
-
-    function checkEnter(event) {
-        if (event.key === 'Enter') { sendMessage(); }
-    }
-</script>
-
-</body>
-</html>
+            iff (!res.ok) return { record: { messages: [] } };return res.json();}).then(data => {if (data && data.record && data.record.messages) {if (data.record.messages.length > chatMessages.length) {chatMessages = data.record.messages;messagesDiv.innerHTML = "";chatMessages.forEach(msg => {const type = (isSelfChat || msg.sender === myName) ? 'sent' : 'received';displayMessage(msg.sender, msg.text, type);});}}}).catch(err => console.error("Lade-Fehler:", err));}function displayMessage(sender, text, type) {const messagesDiv = document.getElementById('messages');const msgElement = document.createElement('div');msgElement.classList.add('msg', type);// Formatiert KI-Antworten saubererif (type === 'ai') {msgElement.innerText = "🤖 KI: " + text;} else {msgElement.innerText = (type === 'received' ? sender + ": " : "") + text;}messagesDiv.appendChild(msgElement);messagesDiv.scrollTop = messagesDiv.scrollHeight;}function checkEnter(event) {if (event.key === 'Enter') { sendMessage(); }}
