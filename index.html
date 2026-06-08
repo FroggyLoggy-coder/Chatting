@@ -4,7 +4,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Chat</title>
-    <!-- Stabile Bibliothek für Direktverbindungen -->
     <script src="https://cloudflare.com"></script>
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; font-family: sans-serif; }
@@ -22,6 +21,7 @@
         input, textarea { background: #444; color: #fff; width: 100%; resize: none; }
         input:focus, textarea:focus { outline: none; }
         button { background: #00a884; color: white; cursor: pointer; font-weight: bold; }
+        button.sec { background: #444; font-size: 0.85rem; padding: 8px; margin-top: 5px; }
         .code-box { background: #333; padding: 10px; border-radius: 4px; text-align: center; font-family: monospace; font-size: 0.9rem; color: #00a884; word-break: break-all; max-height: 100px; overflow-y: auto; }
     </style>
 </head>
@@ -34,12 +34,14 @@
         <p style="text-align: center;">Schritt 1: Klicke auf "Erstellen" für deinen Friend Code</p>
         <button id="start-btn" onclick="initPeer(true)">Meinen Friend Code erstellen</button>
         <div id="my-code" class="code-box" style="display:none;">Generiere Code...</div>
+        <button id="copy-btn" class="sec" style="display:none;" onclick="copyCode()">Code kopieren</button>
         
         <hr style="border-color: #444; margin: 10px 0;">
         
         <p style="text-align: center;">Schritt 2: Friend Code des Freundes eingeben</p>
         <textarea id="friend-code" rows="4" placeholder="Code hier einfügen..."></textarea>
-        <button id="connect-btn" onclick="connectToFriend()">Verbinden</button>
+        <button class="sec" onclick="pasteCode()">Code aus Zwischenablage einfügen</button>
+        <button id="connect-btn" style="margin-top: 10px;" onclick="connectToFriend()">Verbinden</button>
     </div>
 
     <div id="chat-area">
@@ -54,6 +56,15 @@
 <script>
     let p = null;
 
+    // Kostenlose öffentliche Server, um Firewalls im Netzwerk zu umgehen
+    const peerConfig = {
+        iceServers: [
+            { urls: 'stun:://google.com' },
+            { urls: 'stun:://google.com' },
+            { urls: 'stun:://google.com' }
+        ]
+    };
+
     function initPeer(isInitiator) {
         document.getElementById('start-btn').style.display = 'none';
         const codeBox = document.getElementById('my-code');
@@ -61,12 +72,15 @@
 
         p = new SimplePeer({
             initiator: isInitiator,
-            trickle: false
+            trickle: false,
+            config: peerConfig
         });
 
         p.on('signal', data => {
-            // Macht aus den Verbindungsdaten einen kompakten Text-Schlüssel (Friend Code)
             codeBox.innerText = btoa(JSON.stringify(data));
+            if(document.getElementById('copy-btn')) {
+                document.getElementById('copy-btn').style.display = 'block';
+            }
         });
 
         p.on('connect', () => {
@@ -76,6 +90,11 @@
 
         p.on('data', data => {
             displayMessage(data.toString(), 'received');
+        });
+
+        p.on('error', err => {
+            console.error(err);
+            alert('Verbindungsfehler im Netzwerk.');
         });
     }
 
@@ -87,15 +106,28 @@
             const decodedData = JSON.parse(atob(rawCode));
             
             if (!p) {
-                // Falls du derjenige bist, der den Code empfängt, starte den Empfänger-Modus
                 initPeer(false);
                 setTimeout(() => { p.signal(decodedData); }, 500);
             } else {
-                // Falls du den Code des anderen zurückbekommst
                 p.signal(decodedData);
             }
         } catch (e) {
             alert('Ungültiger Friend Code!');
+        }
+    }
+
+    function copyCode() {
+        const text = document.getElementById('my-code').innerText;
+        navigator.clipboard.writeText(text);
+        alert('Code kopiert!');
+    }
+
+    async function pasteCode() {
+        try {
+            const text = await navigator.clipboard.readText();
+            document.getElementById('friend-code').value = text;
+        } catch (err) {
+            alert('Bitte füge den Code manuell ein.');
         }
     }
 
