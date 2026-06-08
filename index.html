@@ -9,10 +9,8 @@
         body { display: flex; justify-content: center; align-items: center; height: 100vh; background-color: #111; color: #fff; }
         #chat-container { width: 100%; max-width: 500px; height: 90vh; background: #222; display: flex; flex-direction: column; border-radius: 8px; overflow: hidden; }
         #header { background: #333; padding: 15px; text-align: center; font-weight: bold; border-bottom: 1px solid #444; }
-        
         .area { padding: 20px; display: flex; flex-direction: column; gap: 15px; justify-content: center; height: 100%; }
         #connect-area, #chat-area { display: none; }
-        
         #messages { flex: 1; padding: 20px; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; background: #111; }
         .msg { max-width: 80%; padding: 10px; border-radius: 8px; word-wrap: break-word; line-height: 1.4; }
         .msg.sent { background-color: #005c4b; align-self: flex-end; }
@@ -29,48 +27,35 @@
     </style>
 </head>
 <body>
-
 <div id="chat-container">
     <div id="header">Chat System</div>
-    
-    <!-- SCHRITT 1: REGISTRIERUNG -->
     <div id="login-area" class="area">
         <p style="text-align: center; font-weight: bold; font-size: 1.2rem;">Schritt 1: Registrieren / Einloggen</p>
-        
         <p style="font-size: 0.9rem; color: #aaa;">Wähle deine Friend-Code-Nummer (6 bis 9 Zahlen):</p>
         <div style="display: flex; align-items: center; gap: 5px;">
             <input type="number" id="my-fc-number" placeholder="Z.B. 555666" min="100000" max="999999999">
             <span class="fc-badge">.fc</span>
         </div>
-
         <p style="font-size: 0.9rem; color: #aaa;">Dein Name im Chat:</p>
         <input type="text" id="username" placeholder="Dein Name...">
-
         <div id="login-error" class="error"></div>
         <button onclick="registerAndLogin()">Registrieren</button>
     </div>
-
-    <!-- SCHRITT 2: VERBINDEN -->
     <div id="connect-area" class="area">
         <p style="text-align: center; font-weight: bold; font-size: 1.2rem;">Schritt 2: Verbinden</p>
-        
         <div class="info-box">
             <p>Dein registrierter Friend Code lautet:</p>
             <p style="margin-top: 5px;"><span id="display-my-fc" style="font-family: monospace; font-size: 1.3rem; color: #00a884; font-weight: bold;"></span><span style="font-weight: bold; color: #aaa;">.fc</span></p>
             <p style="font-size: 0.8rem; color: #aaa; margin-top: 5px;">Tippe die "19" ein, um mit der intelligenten KI zu chatten.</p>
         </div>
-
         <p style="font-size: 0.9rem; color: #aaa; margin-top: 10px;">Trage hier die Nummer deines Freundes ein:</p>
         <div style="display: flex; align-items: center; gap: 5px;">
             <input type="number" id="friend-fc-number" placeholder="Code oder 19 eingeben...">
             <span style="font-weight: bold; font-size: 1.2rem; color: #555;">.fc</span>
         </div>
-
         <div id="connect-error" class="error"></div>
         <button id="connect-btn" onclick="connectToFriend()">Chat starten</button>
     </div>
-
-    <!-- SCHRITT 3: CHATFENSTER -->
     <div id="chat-area" class="area" style="padding: 0;">
         <div id="messages"></div>
         <div id="input-area">
@@ -79,7 +64,6 @@
         </div>
     </div>
 </div>
-
 <script>
     let myFc = "";
     let myName = "";
@@ -89,58 +73,44 @@
     let pollInterval = null;
     let isSelfChat = false;
     let isAiChat = false;
-
     function registerAndLogin() {
         myFc = document.getElementById('my-fc-number').value.trim();
         myName = document.getElementById('username').value.trim();
         const errorDiv = document.getElementById('login-error');
-
         errorDiv.style.display = "none";
-
         if (myFc.length < 6 || myFc.length > 9) {
             errorDiv.innerText = "Fehler: Die Nummer muss zwischen 6 und 9 Stellen lang sein!";
             errorDiv.style.display = "block";
             return;
         }
-
         if (!myName) {
             errorDiv.innerText = "Bitte gib einen Namen ein!";
             errorDiv.style.display = "block";
             return;
         }
-
         document.getElementById('display-my-fc').innerText = myFc;
         document.getElementById('login-area').style.display = 'none';
         document.getElementById('connect-area').style.display = 'flex';
         document.getElementById('header').innerText = `Eingeloggt als: ${myName}`;
     }
-
     function connectToFriend() {
         friendFc = document.getElementById('friend-fc-number').value.trim();
         const errorDiv = document.getElementById('connect-error');
-
         errorDiv.style.display = "none";
-
-        // NEU: Spezialprüfung für den KI-Geheimcode "19"
         if (friendFc === "19") {
             isAiChat = true;
             isSelfChat = false;
             document.getElementById('header').innerText = `🤖 Ultra-Intelligente KI`;
             document.getElementById('connect-area').style.display = 'none';
             document.getElementById('chat-area').style.display = 'flex';
-            
-            // Begrüßung der KI simulieren
             displayMessage("KI", "Hallo! Ich bin deine hochentwickelte KI-Assistentin. Wie kann ich dir heute helfen? Frag mich alles!", "ai");
             return;
         }
-
-        // Normale Längenprüfung für reguläre Freunde
         if (friendFc.length < 6 || friendFc.length > 9) {
             errorDiv.innerText = "Fehler: Die Nummer muss zwischen 6 und 9 Stellen lang sein!";
             errorDiv.style.display = "block";
             return;
         }
-
         isAiChat = false;
         if (friendFc === myFc) {
             isSelfChat = true;
@@ -152,32 +122,23 @@
             myRoom = sortedCodes;
             document.getElementById('header').innerText = `Chat mit ${friendFc}.fc`;
         }
-
         document.getElementById('connect-area').style.display = 'none';
         document.getElementById('chat-area').style.display = 'flex';
-
         getMessages();
         pollInterval = setInterval(getMessages, 2000);
     }
-
     function sendMessage() {
         const input = document.getElementById('message-input');
         const text = input.value.trim();
         if (!text) return;
-
         displayMessage(myName, text, "sent");
         input.value = '';
-
-        // Falls es der KI-Modus ist, leiten wir die Frage an das Sprachmodell weiter
         if (isAiChat) {
             fetchAiResponse(text);
             return;
         }
-
-        // Normaler Chat-Speicher für Freunde oder Selbst-Chat
         const newMsg = { sender: myName, text: text, time: Date.now() };
         chatMessages.push(newMsg);
-
         fetch(`https://jsonbin.io`, {
             method: 'POST',
             headers: {
@@ -189,10 +150,7 @@
         })
         .catch(err => console.error("Sende-Fehler:", err));
     }
-
-    // NEU: Holt die Antwort von einem freien High-End-KI-Server (Llama 3)
     function fetchAiResponse(userText) {
-        // Temporäre "Schreibt..." Nachricht anzeigen
         const messagesDiv = document.getElementById('messages');
         const typingIndicator = document.createElement('div');
         typingIndicator.id = "ai-typing";
@@ -200,15 +158,11 @@
         typingIndicator.innerText = "🤖 KI überlegt...";
         messagesDiv.appendChild(typingIndicator);
         messagesDiv.scrollTop = messagesDiv.scrollHeight;
-
-        // Anfrage an eine freie, serverlose KI-Schnittstelle senden
         fetch(`https://pollinations.ai{encodeURIComponent(userText)}?model=llama`)
         .then(res => res.text())
         .then(aiResponseText => {
-            // "Schreibt..." entfernen und echte Antwort einblenden
             const indicator = document.getElementById("ai-typing");
             if (indicator) indicator.remove();
-            
             displayMessage("KI", aiResponseText, "ai");
         })
         .catch(err => {
@@ -218,10 +172,28 @@
             console.error("KI-Fehler:", err);
         });
     }
-
     function getMessages() {
-        if (isAiChat) return; // KI braucht keinen Cloud-Abruf
-        
+        if (isAiChat) return;
         fetch(`https://jsonbin.io/latest?name=${myRoom}`)
         .then(res => {
-            iff (!res.ok) return { record: { messages: [] } };return res.json();}).then(data => {if (data && data.record && data.record.messages) {if (data.record.messages.length > chatMessages.length) {chatMessages = data.record.messages;messagesDiv.innerHTML = "";chatMessages.forEach(msg => {const type = (isSelfChat || msg.sender === myName) ? 'sent' : 'received';displayMessage(msg.sender, msg.text, type);});}}}).catch(err => console.error("Lade-Fehler:", err));}function displayMessage(sender, text, type) {const messagesDiv = document.getElementById('messages');const msgElement = document.createElement('div');msgElement.classList.add('msg', type);// Formatiert KI-Antworten saubererif (type === 'ai') {msgElement.innerText = "🤖 KI: " + text;} else {msgElement.innerText = (type === 'received' ? sender + ": " : "") + text;}messagesDiv.appendChild(msgElement);messagesDiv.scrollTop = messagesDiv.scrollHeight;}function checkEnter(event) {if (event.key === 'Enter') { sendMessage(); }}
+            if (!res.ok) return { record: { messages: [] } };
+            return res.json();
+        })
+        .then(data => {
+            if (data && data.record && data.record.messages) {
+                if (data.record.messages.length > chatMessages.length) {
+                    chatMessages = data.record.messages;
+                    const messagesDiv = document.getElementById('messages');
+                    messagesDiv.innerHTML = "";
+                    chatMessages.forEach(msg => {
+                        const type = (isSelfChat || msg.sender === myName) ? 'sent' : 'received';
+                        displayMessage(msg.sender, msg.text, type);
+                    });
+                }
+            }
+        })
+        .catch(err => console.error("Lade-Fehler:", err));
+    }
+    function displayMessage(sender, text, type) {
+    
+const messagesDiv = document.getElementById('messages');const msgElement = document.createElement('div');msgElement.classList.add('msg', type);if (type === 'ai') {msgElement.innerText = "🤖 KI: " + text;} else {msgElement.innerText = (type === 'received' ? sender + ": " : "") + text;}messagesDiv.appendChild(msgElement);messagesDiv.scrollTop = messagesDiv.scrollHeight;}function checkEnter(event) {if (event.key === 'Enter') { sendMessage(); }}
